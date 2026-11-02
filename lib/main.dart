@@ -2,30 +2,54 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'haptics.dart';
 import 'cloud_screen.dart';
+import 'app_style.dart';
 import 'firebase_options.dart';
 import 'package:firebase_core/firebase_core.dart';
 
-Future<void> main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
-  try {
-    await Firebase.initializeApp(
-      options: DefaultFirebaseOptions.currentPlatform,
-    );
-    runApp(const SilentPingApp(cloud: true));
-  } catch (_) {
-    runApp(
-      const MaterialApp(
-        home: Scaffold(
-          body: Center(
-            child: Text(
-              'Could not connect to SilentPing. Check your internet and reopen the app.',
-              textAlign: TextAlign.center,
-            ),
-          ),
-        ),
-      ),
-    );
+  runApp(
+    const MaterialApp(debugShowCheckedModeBanner: false, home: AppStartup()),
+  );
+}
+
+class AppStartup extends StatefulWidget {
+  const AppStartup({super.key});
+  @override
+  State<AppStartup> createState() => _AppStartupState();
+}
+
+class _AppStartupState extends State<AppStartup> {
+  late Future<FirebaseApp> initialization;
+  @override
+  void initState() {
+    super.initState();
+    initialization = initialize();
   }
+
+  Future<FirebaseApp> initialize() => Firebase.initializeApp(
+    options: DefaultFirebaseOptions.currentPlatform,
+  ).timeout(const Duration(seconds: 20));
+  @override
+  Widget build(BuildContext context) => Theme(
+    data: silentPingTheme(),
+    child: FutureBuilder<FirebaseApp>(
+      future: initialization,
+      builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return LoadingScreen(
+            error:
+                'Could not open SilentPing. Check your internet and try again.',
+            onRetry: () => setState(() => initialization = initialize()),
+          );
+        }
+        if (snapshot.connectionState != ConnectionState.done) {
+          return const LoadingScreen();
+        }
+        return const SilentPingApp(cloud: true);
+      },
+    ),
+  );
 }
 
 class SilentPingApp extends StatelessWidget {
@@ -36,16 +60,7 @@ class SilentPingApp extends StatelessWidget {
   Widget build(BuildContext context) => MaterialApp(
     title: 'SilentPing',
     debugShowCheckedModeBanner: false,
-    theme: ThemeData(
-      useMaterial3: true,
-      brightness: Brightness.dark,
-      scaffoldBackgroundColor: const Color(0xFF101713),
-      colorScheme: ColorScheme.fromSeed(
-        seedColor: const Color(0xFFBCE5AA),
-        brightness: Brightness.dark,
-      ),
-      fontFamily: 'SilentPing',
-    ),
+    theme: silentPingTheme(),
     home: cloud ? const CloudGate() : const CircleScreen(),
   );
 }

@@ -97,7 +97,10 @@ class PushRegistration {
     var id = prefs.getString('push-installation-id');
     if (id == null) {
       final random = Random.secure();
-      id = List.generate(32, (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0')).join();
+      id = List.generate(
+        32,
+        (_) => random.nextInt(256).toRadixString(16).padLeft(2, '0'),
+      ).join();
       await prefs.setString('push-installation-id', id);
     }
     _deviceId = id;
