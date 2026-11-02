@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "842167862336",
+    "project_id": "silentping-app",
+    "storage_bucket": "silentping-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:842167862336:android:be0fde50c3378d86cccba5",
+        "android_client_info": {
+          "package_name": "com.example.silent_ping"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAp33KokHBlPYMkMY9HK-bhEg_R46aN0JY"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

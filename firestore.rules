@@ -1,0 +1,59 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() { return request.auth != null; }
+    function member(data) { return signedIn() && request.auth.uid in data.memberIds; }
+    match /pushDevices/{deviceId} {
+      allow read: if signedIn() && resource.data.ownerUid == request.auth.uid;
+      allow delete: if signedIn()
+        && (!exists(/databases/$(database)/documents/pushDevices/$(deviceId)) || resource.data.ownerUid == request.auth.uid);
+      allow create, update: if signedIn()
+        && (!exists(/databases/$(database)/documents/pushDevices/$(deviceId)) || resource.data.ownerUid == request.auth.uid)
+        && deviceId.matches('^[a-f0-9]{64}$')
+        && request.resource.data.keys().hasOnly(['ownerUid', 'token', 'platform', 'updatedAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.platform == 'android'
+        && request.resource.data.token is string
+        && request.resource.data.token.size() >= 30
+        && request.resource.data.token.size() <= 4096
+        && request.resource.data.updatedAt == request.time;
+    }
+    match /circles/{circleId} {
+      allow get: if signedIn() && (member(resource.data) || resource.data.status == 'waiting');
+      allow list: if member(resource.data);
+      allow create: if signedIn()
+        && circleId.matches('^[a-f0-9]{32}$')
+        && request.resource.data.keys().hasOnly(['ownerUid', 'guestUid', 'memberIds', 'status', 'createdAt'])
+        && request.resource.data.ownerUid == request.auth.uid
+        && request.resource.data.guestUid == ''
+        && request.resource.data.memberIds == [request.auth.uid]
+        && request.resource.data.status == 'waiting'
+        && request.resource.data.createdAt == request.time;
+      allow update: if signedIn() && (
+        (resource.data.status == 'waiting'
+          && request.auth.uid != resource.data.ownerUid
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['guestUid', 'memberIds', 'status'])
+          && request.resource.data.guestUid == request.auth.uid
+          && request.resource.data.memberIds == [resource.data.ownerUid, request.auth.uid]
+          && request.resource.data.status == 'pending')
+        || (member(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status'])
+          && ((resource.data.status == 'pending' && request.auth.uid == resource.data.ownerUid && request.resource.data.status == 'connected')
+            || (resource.data.status != 'closed' && request.resource.data.status == 'closed')))
+      );
+      match /signals/{senderUid} {
+        function circle() { return get(/databases/$(database)/documents/circles/$(circleId)).data; }
+        function validSignal() {
+          return signedIn() && senderUid == request.auth.uid
+            && member(circle()) && circle().status == 'connected'
+            && request.resource.data.keys().hasOnly(['kind', 'sentAt'])
+            && request.resource.data.kind in ['ambient', 'arrival', 'attention']
+            && request.resource.data.sentAt == request.time;
+        }
+        allow read: if member(circle()) && circle().status == 'connected';
+        allow create: if validSignal();
+        allow update: if validSignal() && request.time >= resource.data.sentAt + duration.value(3, 's');
+      }
+    }
+  }
+}
